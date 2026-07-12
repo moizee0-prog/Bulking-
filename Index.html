@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+<title>BulkLog</title>
+
+<!-- Apple / PWA meta -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BulkLog">
+<meta name="theme-color" content="#0b0b0f">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff9f43'/%3E%3Cstop offset='1' stop-color='%23ff6b35'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='40' fill='%23121218'/%3E%3Ccircle cx='90' cy='78' r='38' fill='none' stroke='url(%23g)' stroke-width='10'/%3E%3Cpath d='M60 130 Q90 110 120 130' stroke='url(%23g)' stroke-width='10' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23121218'/%3E%3Ccircle cx='90' cy='78' r='38' fill='none' stroke='%23ff9f43' stroke-width='10'/%3E%3C/svg%3E">
+<link rel="manifest" href='data:application/manifest+json,{"name":"BulkLog","short_name":"BulkLog","display":"standalone","background_color":"%230b0b0f","theme_color":"%230b0b0f","start_url":"."}'>
+
+<style>
+/* ===================== RESET & BASE ===================== */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;}
+html,body{height:100%;overscroll-behavior:none;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",Helvetica,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+input,textarea{-webkit-user-select:text;user-select:text;}
+
+:root{
+  --bg:#0b0b0f;
+  --bg2:#0f0f14;
+  --card:#17171f;
+  --card2:#1e1e28;
+  --border:rgba(255,255,255,0.07);
+  --border2:rgba(255,255,255,0.12);
+  --text:#f5f5f7;
+  --text-dim:#9a9aa5;
+  --text-dim2:#6c6c76;
+  --accent:#ff9f43;
+  --accent2:#ff6b35;
+  --accent-grad:linear-gradient(135deg,#ffb35c,#ff6b35);
+  --protein:#4facfe;
+  --protein2:#00c2fe;
+  --protein-grad:linear-gradient(135deg,#4facfe,#00c2fe);
+  --success:#32d74b;
+  --danger:#ff453a;
+  --danger-grad:linear-gradient(135deg,#ff6161,#ff453a);
+  --radius:20px;
+  --radius-sm:14px;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+
+/* ===================== APP SHELL ===================== */
+#app{
+  position:fixed;inset:0;
+  display:flex;flex-direction:column;
+  background:radial-gradient(circle at 50% -10%,#1a1a22 0%,var(--bg) 55%);
+}
+.screen{
+  flex:1;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  padding:calc(var(--safe-top) + 18px) 16px calc(90px + var(--safe-bottom)) 16px;
+  display:none;
+  animation:fadeIn .35s ease;
+}
+.screen.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+/* ===================== HEADER ===================== */
+.page-header{margin-bottom:20px;}
+.page-header h1{font-size:30px;font-weight:800;letter-spacing:-0.5px;}
+.page-header p{color:var(--text-dim);font-size:13px;margin-top:2px;}
+.header-row{display:flex;justify-content:space-between;align-items:center;}
+
+/* ===================== CARD ===================== */
+.card{
+  background:linear-gradient(180deg,var(--card),var(--card2));
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:18px;
+  margin-bottom:14px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.25);
+  transition:transform .15s ease;
+}
+.card:active{transform:scale(0.99);}
+.card-title{font-size:14px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:12px;}
+
+/* ===================== RINGS / PROGRESS ===================== */
+.rings-row{display:flex;gap:12px;}
+.ring-card{flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;}
+.ring-wrap{position:relative;width:110px;height:110px;}
+.ring-wrap svg{transform:rotate(-90deg);width:100%;height:100%;}
+.ring-bg{fill:none;stroke:rgba(255,255,255,0.06);stroke-width:10;}
+.ring-fg{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .6s cubic-bezier(.22,1,.36,1);}
+.ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.ring-center .val{font-size:19px;font-weight:800;}
+.ring-center .lbl{font-size:10px;color:var(--text-dim);margin-top:1px;}
+.ring-name{font-size:12px;color:var(--text-dim);font-weight:600;}
+
+.bar-track{
+  width:100%;height:10px;border-radius:6px;background:rgba(255,255,255,0.06);
+  overflow:hidden;margin-top:8px;
+}
+.bar-fill{height:100%;border-radius:6px;transition:width .6s cubic-bezier(.22,1,.36,1);}
+.bar-fill.cal{background:var(--accent-grad);}
+.bar-fill.prot{background:var(--protein-grad);}
+.stat-line{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-dim);margin-top:6px;}
+.stat-line b{color:var(--text);font-weight:700;}
+
+/* ===================== MEAL LIST ===================== */
+.meal-item{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 12px;border-radius:var(--radius-sm);
+  background:var(--card2);border:1px solid var(--border);
+  margin-bottom:10px;transition:all .2s ease;
+}
+.meal-item.done{
+  background:linear-gradient(90deg,rgba(255,159,67,0.14),rgba(255,107,53,0.06));
+  border-color:rgba(255,159,67,0.3);
+}
+.check-circle{
+  width:26px;height:26px;border-radius:50%;
+  border:2px solid var(--text-dim2);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .2s ease;
+}
+.meal-item.done .check-circle{
+  background:var(--accent-grad);border-color:transparent;
+  box-shadow:0 0 12px rgba(255,159,67,0.5);
+}
+.check-circle svg{width:14px;height:14px;opacity:0;transform:scale(0.5);transition:all .2s ease;}
+.meal-item.done .check-circle svg{opacity:1;transform:scale(1);}
+.meal-info{flex:1;min-width:0;}
+.meal-name{font-size:15px;font-weight:700;}
+.meal-item.done .meal-name{color:var(--text-dim);text-decoration:line-through;text-decoration-color:var(--text-dim2);}
+.meal-sub{font-size:12px;color:var(--text-dim);margin-top:2px;}
+.meal-time{font-size:11px;color:var(--text-dim2);font-weight:600;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:20px;flex-shrink:0;}
+
+/* ===================== BUTTONS ===================== */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:14px;border-radius:14px;border:none;
+  font-size:15px;font-weight:700;cursor:pointer;
+  transition:transform .12s ease, opacity .12s ease;
+  -webkit-appearance:none;
+}
+.btn:active{transform:scale(0.96);opacity:0.85;}
+.btn-primary{background:var(--accent-grad);color:#1a0e00;}
+.btn-blue{background:var(--protein-grad);color:#00212e;}
+.btn-outline{background:transparent;border:1.5px solid var(--border2);color:var(--text);}
+.btn-danger{background:var(--danger-grad);color:#2e0000;}
+.btn-ghost{background:rgba(255,255,255,0.06);color:var(--text);}
+.btn-sm{padding:9px 14px;font-size:13px;border-radius:11px;}
+.btn-block{width:100%;}
+.btn-row{display:flex;gap:10px;}
+.fab{
+  position:fixed;right:18px;bottom:calc(96px + var(--safe-bottom));
+  width:56px;height:56px;border-radius:50%;
+  background:var(--accent-grad);border:none;color:#1a0e00;
+  font-size:28px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 10px 26px rgba(255,107,53,0.45);z-index:40;
+  transition:transform .15s ease;
+}
+.fab:active{transform:scale(0.9);}
+
+/* ===================== INPUTS ===================== */
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12.5px;color:var(--text-dim);margin-bottom:6px;font-weight:600;}
+.field input, .field select, .field textarea{
+  width:100%;padding:13px 14px;border-radius:12px;
+  background:var(--bg2);border:1.5px solid var(--border2);
+  color:var(--text);font-size:15px;font-family:inherit;
+  outline:none;transition:border-color .15s ease;
+}
+.field input:focus, .field select:focus, .field textarea:focus{border-color:var(--accent);}
+.field-row{display:flex;gap:10px;}
+.field-row .field{flex:1;}
+
+/* ===================== BOTTOM NAV ===================== */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;
+  display:flex;
+  background:rgba(15,15,20,0.85);
+  backdrop-filter:blur(24px) saturate(1.6);
+  -webkit-backdrop-filter:blur(24px) saturate(1.6);
+  border-top:1px solid var(--border);
+  padding:8px 4px calc(6px + var(--safe-bottom)) 4px;
+  z-index:50;
+}
+.tab-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  background:none;border:none;color:var(--text-dim2);
+  padding:6px 2px;font-size:10.5px;font-weight:600;
+  transition:color .2s ease;
+}
+.tab-btn svg{width:23px;height:23px;transition:transform .2s ease;}
+.tab-btn.active{color:var(--accent);}
+.tab-btn.active svg{transform:translateY(-1px) scale(1.05);}
+
+/* ===================== MODAL ===================== */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.55);
+  backdrop-filter:blur(4px);
+  display:none;align-items:flex-end;justify-content:center;z-index:100;
+  animation:overlayIn .25s ease;
+}
+.modal-overlay.active{display:flex;}
+@keyframes overlayIn{from{opacity:0;}to{opacity:1;}}
+.modal-sheet{
+  width:100%;max-width:520px;
+  background:var(--bg2);
+  border-radius:24px 24px 0 0;
+  border:1px solid var(--border);border-bottom:none;
+  padding:14px 20px calc(24px + var(--safe-bottom)) 20px;
+  max-height:88vh;overflow-y:auto;
+  animation:sheetUp .3s cubic-bezier(.22,1,.36,1);
+}
+@keyframes sheetUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.sheet-handle{width:38px;height:5px;background:var(--border2);border-radius:4px;margin:0 auto 16px auto;}
+.sheet-title{font-size:19px;font-weight:800;margin-bottom:16px;}
+
+/* ===================== TOAST ===================== */
+.toast{
+  position:fixed;left:50%;top:calc(var(--safe-top) + 14px);
+  transform:translate(-50%,-140%);
+  background:var(--card2);border:1px solid var(--border2);
+  padding:12px 20px;border-radius:30px;font-size:13.5px;font-weight:600;
+  box-shadow:0 10px 30px rgba(0,0,0,0.4);z-index:200;
+  transition:transform .35s cubic-bezier(.22,1,.36,1);
+  display:flex;align-items:center;gap:8px;white-space:nowrap;
+}
+.toast.show{transform:translate(-50%,0);}
+.toast .dot{width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;}
+
+/* ===================== MISC ===================== */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-dim);}
+.empty-state .emoji{font-size:40px;margin-bottom:10px;}
+.chip{display:inline-flex;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.06);font-size:11px;color:var(--text-dim);font-weight:600;margin-right:6px;}
+.chip.accent{background:rgba(255,159,67,0.15);color:var(--accent);}
+.chip.blue{background:rgba(79,172,254,0.15);color:var(--protein);}
+.divider{height:1px;background:var(--border);margin:16px 0;}
+.list-row{display:flex;justify-content:space-between;align-items:center;padding:13px 2px;border-bottom:1px solid var(--border);}
+.list-row:last-child{border-bottom:none;}
+.list-row .lr-title{font-size:14.5px;font-weight:600;}
+.list-row .lr-sub{font-size:12px;color:var(--text-dim);margin-top:2px;}
+.icon-btn{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,0.06);border:none;color:var(--text-dim);display:flex;align-items:center;justify-content:center;}
+.icon-btn:active{background:rgba(255,255,255,0.12);}
+.switch{position:relative;width:46px;height:27px;background:rgba(255,255,255,0.12);border-radius:20px;transition:background .2s ease;flex-shrink:0;}
+.switch.on{background:var(--accent-grad);}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:23px;height:23px;background:#fff;border-radius:50%;transition:transform .2s cubic-bezier(.22,1,.36,1);box-shadow:0 2px 5px rgba(0,0,0,0.3);}
+.switch.on::after{transform:translateX(19px);}
+canvas{width:100%;display:block;}
+.search-bar{
+  display:flex;align-items:center;gap:8px;background:var(--card2);
+  border:1.5px solid var(--border2);border-radius:14px;padding:11px 14px;margin-bottom:14px;
+}
+.search-bar input{background:none;border:none;outline:none;color:var(--text);font-size:14.5px;flex:1;font-family:inherit;}
+.search-bar svg{width:17px;height:17px;color:var(--text-dim);flex-shrink:0;}
+.segment{display:flex;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:3px;margin-bottom:16px;}
+.segment button{flex:1;padding:9px;border:none;background:none;color:var(--text-dim);font-size:13px;font-weight:700;border-radius:9px;transition:all .2s ease;}
+.segment button.active{background:var(--accent-grad);color:#1a0e00;}
+.weight-badge{font-size:26px;font-weight:800;}
+.weight-delta{font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:20px;}
+.weight-delta.up{background:rgba(50,215,75,0.15);color:var(--success);}
+.weight-delta.down{background:rgba(255,69,58,0.15);color:var(--danger);}
+.weight-delta.flat{background:rgba(255,255,255,0.08);color:var(--text-dim);}
+::-webkit-scrollbar{display:none;}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============= TODAY SCREEN ============= -->
+  <div class="screen active" id="screen-today">
+    <div class="page-header">
+      <div class="header-row">
+        <div>
+          <h1>Today</h1>
+          <p id="today-date-label">—</p>
+        </div>
+        <button class="icon-btn" onclick="openQuickAdd()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="rings-row">
+        <div class="ring-card">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 110 110">
+              <circle class="ring-bg" cx="55" cy="55" r="47"/>
+              <circle class="ring-fg" id="ring-cal" cx="55" cy="55" r="47" stroke="url(#gradCal)"/>
+              <defs>
+                <linearGradient id="gradCal" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#ffb35c"/><stop offset="1" stop-color="#ff6b35"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="ring-center">
+              <div class="val" id="cal-current">0</div>
+              <div class="lbl">/ <span id="cal-target-lbl">0</span> kcal</div>
+            </div>
+          </div>
+          <div class="ring-name">Calories</div>
+        </div>
+        <div class="ring-card">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 110 110">
+              <circle class="ring-bg" cx="55" cy="55" r="47"/>
+              <circle class="ring-fg" id="ring-prot" cx="55" cy="55" r="47" stroke="url(#gradProt)"/>
+              <defs>
+                <linearGradient id="gradProt" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#4facfe"/><stop offset="1" stop-color="#00c2fe"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="ring-center">
+              <div class="val" id="prot-current">0</div>
+              <div class="lbl">/ <span id="prot-target-lbl">0</span> g</div>
+            </div>
+          </div>
+          <div class="ring-name">Protein</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="stat-line"><span>Remaining calories</span><b id="cal-remaining">0 kcal</b></div>
+      <div class="stat-line"><span>Remaining protein</span><b id="prot-remaining">0 g</b></div>
+    </div>
+
+    <div class="card">
+      <div class="header-row" style="margin-bottom:10px;">
+        <div class="card-title" style="margin-bottom:0;">Meal Checklist</div>
+        <span class="chip accent" id="meals-done-chip">0/0 done</span>
+      </div>
+      <div id="today-meal-list"></div>
+    </div>
+
+    <div class="card" id="extra-log-card">
+      <div class="card-title">Extra Logged Today</div>
+      <div id="extra-log-list"></div>
+      <div class="empty-state" id="extra-empty" style="display:none;padding:16px;">
+        <p style="font-size:13px;">No extra items logged. Tap + to add a quick snack or shake.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============= WEIGHT SCREEN ============= -->
+  <div class="screen" id="screen-weight">
+    <div class="page-header">
+      <h1>Weight</h1>
+      <p>Track your bulking progress</p>
+    </div>
+
+    <div class="card">
+      <div class="header-row">
+        <div>
+          <div class="weight-badge" id="latest-weight">--</div>
+          <div style="color:var(--text-dim);font-size:12.5px;margin-top:2px;" id="latest-weight-date">No entries yet</div>
+        </div>
+        <div id="weight-delta-badge" class="weight-delta flat">—</div>
+      </div>
+      <div class="divider"></div>
+      <canvas id="weightChart" height="180"></canvas>
+    </div>
+
+    <div class="btn-row" style="margin-bottom:16px;">
+      <button class="btn btn-blue btn-block" onclick="openWeightModal()">+ Log Weight</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">History</div>
+      <div id="weight-history-list"></div>
+      <div class="empty-state" id="weight-empty">
+        <div class="emoji">⚖️</div>
+        <p>No weight logs yet. Add your first entry above.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============= HISTORY SCREEN ============= -->
+  <div class="screen" id="screen-history">
+    <div class="page-header">
+      <h1>History</h1>
+      <p>Search and review past days</p>
+    </div>
+
+    <div class="search-bar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="history-search" placeholder="Search by date or meal name..." oninput="renderHistory()">
+    </div>
+
+    <div id="history-list"></div>
+    <div class="empty-state" id="history-empty">
+      <div class="emoji">📖</div>
+      <p>No history yet — it fills in as days complete.</p>
+    </div>
+  </div>
+
+  <!-- ============= PLAN SCREEN ============= -->
+  <div class="screen" id="screen-plan">
+    <div class="page-header">
+      <div class="header-row">
+        <div>
+          <h1>Meal Plan</h1>
+          <p>Your daily calorie-dense lineup</p>
+        </div>
+        <button class="icon-btn" onclick="openMealModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="plan-list"></div>
+  </div>
+
+  <!-- ============= SETTINGS SCREEN ============= -->
+  <div class="screen" id="screen-settings">
+    <div class="page-header">
+      <h1>Settings</h1>
+      <p>Targets, reminders & data</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Daily Targets</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Calorie Target (kcal)</label>
+          <input type="number" id="set-cal-target" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>Protein Target (g)</label>
+          <input type="number" id="set-prot-target" inputmode="numeric">
+        </div>
+      </div>
+      <div class="field">
+        <label>Weight Unit</label>
+        <select id="set-weight-unit">
+          <option value="kg">Kilograms (kg)</option>
+          <option value="lb">Pounds (lb)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="saveSettings()">Save Targets</button>
+    </div>
+
+    <div class="card">
+      <div class="header-row" style="margin-bottom:10px;">
+        <div class="card-title" style="margin-bottom:0;">Reminders</div>
+        <button class="icon-btn" onclick="openReminderModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div id="reminder-list"></div>
+      <div class="empty-state" id="reminder-empty" style="padding:16px;">
+        <p style="font-size:13px;">No reminders set.</p>
+      </div>
+      <p style="font-size:11.5px;color:var(--text-dim2);margin-top:10px;line-height:1.5;">Reminders fire while BulkLog is open in a browser tab or installed as an app. Enable notifications when prompted.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Data & Export</div>
+      <button class="btn btn-outline btn-block" style="margin-bottom:10px;" onclick="exportExcel()">⬇ Export to Excel (.xls)</button>
+      <button class="btn btn-outline btn-block" style="margin-bottom:10px;" onclick="triggerBackup()">⬇ Backup as JSON</button>
+      <button class="btn btn-danger btn-block" onclick="confirmReset()">Reset All Data</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">About</div>
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;">BulkLog — offline-first weight gain & nutrition tracker. All data stays on this device in local storage. No account, no cloud, no tracking.</p>
+    </div>
+  </div>
+
+  <!-- ============= TAB BAR ============= -->
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="today" onclick="switchTab('today')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      <span>Today</span>
+    </button>
+    <button class="tab-btn" data-tab="weight" onclick="switchTab('weight')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
+      <span>Weight</span>
+    </button>
+    <button class="tab-btn" data-tab="history" onclick="switchTab('history')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      <span>History</span>
+    </button>
+    <button class="tab-btn" data-tab="plan" onclick="switchTab('plan')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+      <span>Plan</span>
+    </button>
+    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span>Settings</span>
+    </button>
+  </div>
+
+  <button class="fab" id="fab-add" onclick="handleFabTap()">+</button>
+</div>
+
+<!-- ============= MODAL: QUICK ADD EXTRA ============= -->
+<div class="modal-overlay" id="modal-quickadd">
+  <div class="modal-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Log Extra Food</div>
+    <div class="field">
+      <label>Item name</label>
+      <input type="text" id="qa-name" placeholder="e.g. Peanut butter shake">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Calories</label>
+        <input type="number" id="qa-cal" inputmode="numeric" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Protein (g)</label>
+        <input type="number" id="qa-prot" inputmode="numeric" placeholder="0">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline btn-block" onclick="closeModal('modal-quickadd')">Cancel</button>
+      <button class="btn btn-primary btn-block" onclick="saveQuickAdd()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============= MODAL: MEAL PLAN EDIT ============= -->
+<div class="modal-overlay" id="modal-meal">
+  <div class="modal-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="meal-modal-title">Add Meal</div>
+    <input type="hidden" id="meal-edit-id">
+    <div class="field">
+      <label>Meal name</label>
+      <input type="text" id="meal-name" placeholder="e.g. Mid-morning Shake">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Time</label>
+        <input type="time" id="meal-time">
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select id="meal-category">
+          <option>Breakfast</option>
+          <option>Snack</option>
+          <option>Lunch</option>
+          <option>Dinner</option>
+          <option>Shake</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Calories</label>
+        <input type="number" id="meal-cal" inputmode="numeric" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Protein (g)</label>
+        <input type="number" id="meal-prot" inputmode="numeric" placeholder="0">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline btn-block" onclick="closeModal('modal-meal')">Cancel</button>
+      <button class="btn btn-primary btn-block" onclick="saveMeal()">Save Meal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============= MODAL: WEIGHT LOG ============= -->
+<div class="modal-overlay" id="modal-weight">
+  <div class="modal-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Log Weight</div>
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="wt-date">
+    </div>
+    <div class="field">
+      <label>Weight (<span id="wt-unit-lbl">kg</span>)</label>
+      <input type="number" step="0.1" id="wt-value" inputmode="decimal" placeholder="0.0">
+    </div>
+    <div class="field">
+      <label>Note (optional)</label>
+      <input type="text" id="wt-note" placeholder="e.g. after workout, fasted">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline btn-block" onclick="closeModal('modal-weight')">Cancel</button>
+      <button class="btn btn-blue btn-block" onclick="saveWeight()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============= MODAL: REMINDER ============= -->
+<div class="modal-overlay" id="modal-reminder">
+  <div class="modal-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Add Reminder</div>
+    <div class="field">
+      <label>Label</label>
+      <input type="text" id="rem-label" placeholder="e.g. Evening shake time">
+    </div>
+    <div class="field">
+      <label>Time</label>
+      <input type="time" id="rem-time">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline btn-block" onclick="closeModal('modal-reminder')">Cancel</button>
+      <button class="btn btn-primary btn-block" onclick="saveReminder()">Add Reminder</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="dot"></span><span id="toast-text">Saved</span></div>
+
+<script>
+/* ============================================================
+   BULKLOG — offline PWA, single-file
+   ============================================================ */
+
+/* ---------- Storage keys ---------- */
+const K_SETTINGS = 'bulklog_settings';
+const K_PLAN = 'bulklog_mealplan';
+const K_TODAY = 'bulklog_today';
+const K_HISTORY = 'bulklog_history';
+const K_WEIGHTS = 'bulklog_weights';
+const K_REMINDERS = 'bulklog_reminders';
+
+/* ---------- Defaults ---------- */
+const DEFAULT_SETTINGS = { calTarget: 3200, protTarget: 150, weightUnit: 'kg' };
+
+const DEFAULT_PLAN = [
+  { id: 'm1', name: 'Breakfast', time: '08:00', category: 'Breakfast', cal: 650, prot: 30 },
+  { id: 'm2', name: 'Mid-morning Peanut Butter Shake', time: '11:00', category: 'Shake', cal: 500, prot: 25 },
+  { id: 'm3', name: 'Lunch', time: '13:30', category: 'Lunch', cal: 800, prot: 35 },
+  { id: 'm4', name: 'Evening Snack', time: '17:00', category: 'Snack', cal: 400, prot: 15 },
+  { id: 'm5', name: 'Dinner', time: '20:30', category: 'Dinner', cal: 700, prot: 30 },
+  { id: 'm6', name: 'Pre-bed Casein Shake', time: '22:30', category: 'Shake', cal: 350, prot: 25 }
+];
+
+function todayStr(){
+  const d = new Date();
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+dd;
+}
+function fmtDateNice(str){
+  const d = new Date(str+'T00:00:00');
+  return d.toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'});
+}
+function fmtDateShort(str){
+  const d = new Date(str+'T00:00:00');
+  return d.toLocaleDateString(undefined,{month:'short', day:'numeric', year:'numeric'});
+}
+function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ---------- Load / Save helpers ---------- */
+function load(key, fallback){
+  try{
+    const raw = localStorage.getItem(key);
+    if(raw === null) return fallback;
+    return JSON.parse(raw);
+  }catch(e){ return fallback; }
+}
+function save(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+let settings = load(K_SETTINGS, DEFAULT_SETTINGS);
+let plan = load(K_PLAN, DEFAULT_PLAN);
+let today = load(K_TODAY, null);
+let history = load(K_HISTORY, []);
+let weights = load(K_WEIGHTS, []);
+let reminders = load(K_REMINDERS, []);
+
+function freshToday(){
+  return { date: todayStr(), completed: [], extras: [] };
+}
+
+/* ---------- Daily rollover ---------- */
+function ensureTodayCurrent(){
+  const now = todayStr();
+  if(!today){
+    today = freshToday();
+    save(K_TODAY, today);
+    return;
+  }
+  if(today.date !== now){
+    // archive previous day into history
+    const totals = computeTotals(today);
+    const entry = {
+      date: today.date,
+      completed: today.completed,
+      extras: today.extras,
+      totalCal: totals.cal,
+      totalProt: totals.prot,
+      mealsPlanned: plan.length,
+      mealsDone: today.completed.length
+    };
+    history.unshift(entry);
+    save(K_HISTORY, history);
+    today = freshToday();
+    save(K_TODAY, today);
+  }
+}
+
+function computeTotals(dayObj){
+  let cal = 0, prot = 0;
+  dayObj.completed.forEach(id=>{
+    const m = plan.find(p=>p.id===id);
+    if(m){ cal += Number(m.cal)||0; prot += Number(m.prot)||0; }
+  });
+  (dayObj.extras||[]).forEach(e=>{ cal += Number(e.cal)||0; prot += Number(e.prot)||0; });
+  return { cal, prot };
+}
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ---------- Tabs ---------- */
+function switchTab(tab){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+tab).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.tab-btn[data-tab="'+tab+'"]').classList.add('active');
+  currentTab = tab;
+  document.getElementById('fab-add').style.display = (tab==='today'||tab==='weight'||tab==='plan') ? 'flex' : 'none';
+  if(tab==='today') renderToday();
+  if(tab==='weight') renderWeight();
+  if(tab==='history') renderHistory();
+  if(tab==='plan') renderPlan();
+  if(tab==='settings') renderSettings();
+}
+let currentTab = 'today';
+function handleFabTap(){
+  if(currentTab==='today') openQuickAdd();
+  else if(currentTab==='weight') openWeightModal();
+  else if(currentTab==='plan') openMealModal();
+}
+
+/* ---------- Modals ---------- */
+function openModal(id){ document.getElementById(id).classList.add('active'); }
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+document.querySelectorAll('.modal-overlay').forEach(ov=>{
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.classList.remove('active'); });
+});
+
+/* ---------- TODAY render ---------- */
+function renderToday(){
+  ensureTodayCurrent();
+  document.getElementById('today-date-label').textContent = fmtDateNice(today.date);
+
+  const totals = computeTotals(today);
+  const calPct = Math.min(100, (totals.cal/Math.max(1,settings.calTarget))*100);
+  const protPct = Math.min(100, (totals.prot/Math.max(1,settings.protTarget))*100);
+
+  document.getElementById('cal-current').textContent = totals.cal;
+  document.getElementById('cal-target-lbl').textContent = settings.calTarget;
+  document.getElementById('prot-current').textContent = totals.prot;
+  document.getElementById('prot-target-lbl').textContent = settings.protTarget;
+  document.getElementById('cal-remaining').textContent = Math.max(0,settings.calTarget-totals.cal)+' kcal';
+  document.getElementById('prot-remaining').textContent = Math.max(0,settings.protTarget-totals.prot)+' g';
+
+  const R = 47, C = 2*Math.PI*R;
+  const calRing = document.getElementById('ring-cal');
+  const protRing = document.getElementById('ring-prot');
+  calRing.style.strokeDasharray = C;
+  calRing.style.strokeDashoffset = C - (calPct/100)*C;
+  protRing.style.strokeDasharray = C;
+  protRing.style.strokeDashoffset = C - (protPct/100)*C;
+
+  // meal list
+  const list = document.getElementById('today-meal-list');
+  list.innerHTML = '';
+  const sorted = [...plan].sort((a,b)=> (a.time||'').localeCompare(b.time||''));
+  if(sorted.length===0){
+    list.innerHTML = '<div class="empty-state"><div class="emoji">🍽️</div><p>No meals planned yet. Add some in the Plan tab.</p></div>';
+  }
+  sorted.forEach(m=>{
+    const done = today.completed.includes(m.id);
+    const row = document.createElement('div');
+    row.className = 'meal-item'+(done?' done':'');
+    row.onclick = ()=>toggleMeal(m.id);
+    row.innerHTML =
+      '<div class="check-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#1a0e00" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>'+
+      '<div class="meal-info"><div class="meal-name">'+escapeHtml(m.name)+'</div>'+
+      '<div class="meal-sub">'+m.cal+' kcal · '+m.prot+'g protein · '+escapeHtml(m.category||'')+'</div></div>'+
+      '<div class="meal-time">'+(m.time||'--:--')+'</div>';
+    list.appendChild(row);
+  });
+  document.getElementById('meals-done-chip').textContent = today.completed.length+'/'+plan.length+' done';
+
+  // extras
+  const exList = document.getElementById('extra-log-list');
+  const exEmpty = document.getElementById('extra-empty');
+  exList.innerHTML = '';
+  if((today.extras||[]).length===0){ exEmpty.style.display='block'; }
+  else{
+    exEmpty.style.display='none';
+    today.extras.forEach((e,idx)=>{
+      const row = document.createElement('div');
+      row.className = 'list-row';
+      row.innerHTML = '<div><div class="lr-title">'+escapeHtml(e.name)+'</div>'+
+        '<div class="lr-sub">'+e.cal+' kcal · '+e.prot+'g protein</div></div>'+
+        '<button class="icon-btn" onclick="removeExtra('+idx+', event)">✕</button>';
+      exList.appendChild(row);
+    });
+  }
+}
+function toggleMeal(id){
+  ensureTodayCurrent();
+  const idx = today.completed.indexOf(id);
+  if(idx>-1) today.completed.splice(idx,1);
+  else today.completed.push(id);
+  save(K_TODAY, today);
+  renderToday();
+  if(navigator.vibrate) navigator.vibrate(12);
+}
+function removeExtra(idx, ev){
+  ev.stopPropagation();
+  today.extras.splice(idx,1);
+  save(K_TODAY, today);
+  renderToday();
+}
+
+/* ---------- Quick add extra ---------- */
+function openQuickAdd(){
+  document.getElementById('qa-name').value='';
+  document.getElementById('qa-cal').value='';
+  document.getElementById('qa-prot').value='';
+  openModal('modal-quickadd');
+}
+function saveQuickAdd(){
+  const name = document.getElementById('qa-name').value.trim();
+  const cal = Number(document.getElementById('qa-cal').value)||0;
+  const prot = Number(document.getElementById('qa-prot').value)||0;
+  if(!name){ showToast('Enter an item name'); return; }
+  ensureTodayCurrent();
+  today.extras = today.extras || [];
+  today.extras.push({ name, cal, prot });
+  save(K_TODAY, today);
+  closeModal('modal-quickadd');
+  renderToday();
+  showToast('Added '+name);
+}
+
+/* ---------- Weight ---------- */
+function renderWeight(){
+  const sorted = [...weights].sort((a,b)=> a.date.localeCompare(b.date));
+  const unit = settings.weightUnit;
+  document.getElementById('wt-unit-lbl').textContent = unit;
+
+  if(sorted.length===0){
+    document.getElementById('latest-weight').textContent = '--';
+    document.getElementById('latest-weight-date').textContent = 'No entries yet';
+    document.getElementById('weight-delta-badge').textContent = '—';
+    document.getElementById('weight-delta-badge').className = 'weight-delta flat';
+  } else {
+    const last = sorted[sorted.length-1];
+    document.getElementById('latest-weight').textContent = last.weight+' '+unit;
+    document.getElementById('latest-weight-date').textContent = fmtDateShort(last.date);
+    const badge = document.getElementById('weight-delta-badge');
+    if(sorted.length>1){
+      const prev = sorted[sorted.length-2];
+      const diff = (last.weight - prev.weight);
+      const sign = diff>0?'+':'';
+      badge.textContent = sign+diff.toFixed(1)+' '+unit;
+      badge.className = 'weight-delta '+(diff>0?'up':(diff<0?'down':'flat'));
+    } else {
+      badge.textContent = 'First entry';
+      badge.className = 'weight-delta flat';
+    }
+  }
+
+  drawWeightChart(sorted);
+
+  const listEl = document.getElementById('weight-history-list');
+  const emptyEl = document.getElementById('weight-empty');
+  listEl.innerHTML = '';
+  if(sorted.length===0){ emptyEl.style.display='block'; }
+  else{
+    emptyEl.style.display='none';
+    [...sorted].reverse().forEach(w=>{
+      const row = document.createElement('div');
+      row.className = 'list-row';
+      row.innerHTML = '<div><div class="lr-title">'+w.weight+' '+unit+'</div>'+
+        '<div class="lr-sub">'+fmtDateShort(w.date)+(w.note?(' · '+escapeHtml(w.note)):'')+'</div></div>'+
+        '<button class="icon-btn" onclick="deleteWeight(\''+w.id+'\')">✕</button>';
+      listEl.appendChild(row);
+    });
+  }
+}
+function openWeightModal(){
+  document.getElementById('wt-date').value = todayStr();
+  document.getElementById('wt-value').value = '';
+  document.getElementById('wt-note').value = '';
+  openModal('modal-weight');
+}
+function saveWeight(){
+  const date = document.getElementById('wt-date').value || todayStr();
+  const val = Number(document.getElementById('wt-value').value);
+  const note = document.getElementById('wt-note').value.trim();
+  if(!val || val<=0){ showToast('Enter a valid weight'); return; }
+  const existingIdx = weights.findIndex(w=>w.date===date);
+  if(existingIdx>-1){ weights[existingIdx].weight = val; weights[existingIdx].note = note; }
+  else{ weights.push({ id: uid(), date, weight: val, note }); }
+  save(K_WEIGHTS, weights);
+  closeModal('modal-weight');
+  renderWeight();
+  showToast('Weight logged');
+}
+function deleteWeight(id){
+  weights = weights.filter(w=>w.id!==id);
+  save(K_WEIGHTS, weights);
+  renderWeight();
+}
+
+/* custom canvas line chart, no external deps */
+function drawWeightChart(sorted){
+  const canvas = document.getElementById('weightChart');
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || 300;
+  const cssH = 180;
+  canvas.width = cssW*dpr; canvas.height = cssH*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,cssW,cssH);
+
+  if(sorted.length===0){
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '13px -apple-system';
+    ctx.textAlign = 'center';
+    ctx.fillText('Log your weight to see a trend chart', cssW/2, cssH/2);
+    return;
+  }
+  const pts = sorted.slice(-30);
+  const vals = pts.map(p=>p.weight);
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if(min===max){ min-=1; max+=1; }
+  const pad = (max-min)*0.15;
+  min -= pad; max += pad;
+
+  const padL = 8, padR = 8, padT = 14, padB = 22;
+  const plotW = cssW-padL-padR, plotH = cssH-padT-padB;
+
+  // grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for(let i=0;i<=3;i++){
+    const y = padT + (plotH/3)*i;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(cssW-padR,y); ctx.stroke();
+  }
+
+  const xFor = i => padL + (pts.length===1 ? plotW/2 : (plotW*i/(pts.length-1)));
+  const yFor = v => padT + plotH - ((v-min)/(max-min))*plotH;
+
+  // gradient fill under line
+  const grad = ctx.createLinearGradient(0,padT,0,padT+plotH);
+  grad.addColorStop(0,'rgba(255,159,67,0.35)');
+  grad.addColorStop(1,'rgba(255,159,67,0.02)');
+  ctx.beginPath();
+  pts.forEach((p,i)=>{ const x=xFor(i), y=yFor(p.weight); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.lineTo(xFor(pts.length-1), padT+plotH);
+  ctx.lineTo(xFor(0), padT+plotH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // line
+  ctx.beginPath();
+  pts.forEach((p,i)=>{ const x=xFor(i), y=yFor(p.weight); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  const lineGrad = ctx.createLinearGradient(0,0,cssW,0);
+  lineGrad.addColorStop(0,'#ffb35c'); lineGrad.addColorStop(1,'#ff6b35');
+  ctx.strokeStyle = lineGrad;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round'; ctx.lineCap='round';
+  ctx.stroke();
+
+  // points
+  pts.forEach((p,i)=>{
+    const x=xFor(i), y=yFor(p.weight);
+    ctx.beginPath(); ctx.arc(x,y,3.2,0,Math.PI*2);
+    ctx.fillStyle = '#0b0b0f'; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle='#ff9f43'; ctx.stroke();
+  });
+
+  // x labels (first / last)
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '10px -apple-system';
+  ctx.textAlign = 'left';
+  ctx.fillText(fmtDateShort(pts[0].date), padL, cssH-6);
+  ctx.textAlign = 'right';
+  ctx.fillText(fmtDateShort(pts[pts.length-1].date), cssW-padR, cssH-6);
+}
+
+/* ---------- History ---------- */
+function renderHistory(){
+  const q = (document.getElementById('history-search').value||'').toLowerCase().trim();
+  const listEl = document.getElementById('history-list');
+  const emptyEl = document.getElementById('history-empty');
+  listEl.innerHTML = '';
+
+  let items = [...history];
+  if(q){
+    items = items.filter(h=>{
+      if(h.date.toLowerCase().includes(q)) return true;
+      if(fmtDateShort(h.date).toLowerCase().includes(q)) return true;
+      const mealNames = h.completed.map(id=>{
+        const m = plan.find(p=>p.id===id);
+        return m ? m.name.toLowerCase() : '';
+      }).join(' ');
+      const extraNames = (h.extras||[]).map(e=>e.name.toLowerCase()).join(' ');
+      return mealNames.includes(q) || extraNames.includes(q);
+    });
+  }
+
+  if(items.length===0){ emptyEl.style.display='block'; return; }
+  emptyEl.style.display='none';
+
+  items.forEach(h=>{
+    const card = document.createElement('div');
+    card.className = 'card';
+    const calPct = Math.min(100,(h.totalCal/Math.max(1,settings.calTarget))*100);
+    const protPct = Math.min(100,(h.totalProt/Math.max(1,settings.protTarget))*100);
+    card.innerHTML =
+      '<div class="header-row" style="margin-bottom:10px;">'+
+        '<div><div style="font-weight:800;font-size:15.5px;">'+fmtDateShort(h.date)+'</div>'+
+        '<div style="font-size:12px;color:var(--text-dim);">'+h.mealsDone+'/'+h.mealsPlanned+' meals completed</div></div>'+
+        '<span class="chip accent">'+h.totalCal+' kcal</span>'+
+      '</div>'+
+      '<div class="stat-line"><span>Calories</span><b>'+h.totalCal+' / '+settings.calTarget+'</b></div>'+
+      '<div class="bar-track"><div class="bar-fill cal" style="width:'+calPct+'%"></div></div>'+
+      '<div class="stat-line" style="margin-top:10px;"><span>Protein</span><b>'+h.totalProt+' / '+settings.protTarget+'g</b></div>'+
+      '<div class="bar-track"><div class="bar-fill prot" style="width:'+protPct+'%"></div></div>';
+    listEl.appendChild(card);
+  });
+}
+
+/* ---------- Plan (CRUD) ---------- */
+function renderPlan(){
+  const listEl = document.getElementById('plan-list');
+  listEl.innerHTML = '';
+  const sorted = [...plan].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  if(sorted.length===0){
+    listEl.innerHTML = '<div class="empty-state"><div class="emoji">📝</div><p>No meals yet. Tap + to build your plan.</p></div>';
+    return;
+  }
+  sorted.forEach(m=>{
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.marginBottom='10px';
+    card.innerHTML =
+      '<div class="header-row">'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-weight:800;font-size:15.5px;">'+escapeHtml(m.name)+'</div>'+
+          '<div style="font-size:12.5px;color:var(--text-dim);margin-top:3px;">'+m.time+' · '+escapeHtml(m.category||'')+'</div>'+
+          '<div style="margin-top:8px;"><span class="chip accent">'+m.cal+' kcal</span><span class="chip blue">'+m.prot+'g protein</span></div>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:8px;">'+
+          '<button class="icon-btn" onclick="editMeal(\''+m.id+'\')">✎</button>'+
+          '<button class="icon-btn" onclick="deleteMeal(\''+m.id+'\')">✕</button>'+
+        '</div>'+
+      '</div>';
+    listEl.appendChild(card);
+  });
+}
+function openMealModal(){
+  document.getElementById('meal-modal-title').textContent = 'Add Meal';
+  document.getElementById('meal-edit-id').value='';
+  document.getElementById('meal-name').value='';
+  document.getElementById('meal-time').value='';
+  document.getElementById('meal-category').value='Breakfast';
+  document.getElementById('meal-cal').value='';
+  document.getElementById('meal-prot').value='';
+  openModal('modal-meal');
+}
+function editMeal(id){
+  const m = plan.find(p=>p.id===id);
+  if(!m) return;
+  document.getElementById('meal-modal-title').textContent = 'Edit Meal';
+  document.getElementById('meal-edit-id').value = m.id;
+  document.getElementById('meal-name').value = m.name;
+  document.getElementById('meal-time').value = m.time;
+  document.getElementById('meal-category').value = m.category;
+  document.getElementById('meal-cal').value = m.cal;
+  document.getElementById('meal-prot').value = m.prot;
+  openModal('modal-meal');
+}
+function saveMeal(){
+  const id = document.getElementById('meal-edit-id').value;
+  const name = document.getElementById('meal-name').value.trim();
+  const time = document.getElementById('meal-time').value || '00:00';
+  const category = document.getElementById('meal-category').value;
+  const cal = Number(document.getElementById('meal-cal').value)||0;
+  const prot = Number(document.getElementById('meal-prot').value)||0;
+  if(!name){ showToast('Enter a meal name'); return; }
+  if(id){
+    const m = plan.find(p=>p.id===id);
+    if(m){ m.name=name; m.time=time; m.category=category; m.cal=cal; m.prot=prot; }
+  } else {
+    plan.push({ id: uid(), name, time, category, cal, prot });
+  }
+  save(K_PLAN, plan);
+  closeModal('modal-meal');
+  renderPlan();
+  showToast('Meal saved');
+}
+function deleteMeal(id){
+  plan = plan.filter(p=>p.id!==id);
+  save(K_PLAN, plan);
+  if(today){ today.completed = today.completed.filter(cid=>cid!==id); save(K_TODAY, today); }
+  renderPlan();
+  showToast('Meal removed');
+}
+
+/* ---------- Settings ---------- */
+function renderSettings(){
+  document.getElementById('set-cal-target').value = settings.calTarget;
+  document.getElementById('set-prot-target').value = settings.protTarget;
+  document.getElementById('set-weight-unit').value = settings.weightUnit;
+  renderReminders();
+}
+function saveSettings(){
+  settings.calTarget = Number(document.getElementById('set-cal-target').value)||DEFAULT_SETTINGS.calTarget;
+  settings.protTarget = Number(document.getElementById('set-prot-target').value)||DEFAULT_SETTINGS.protTarget;
+  settings.weightUnit = document.getElementById('set-weight-unit').value;
+  save(K_SETTINGS, settings);
+  showToast('Settings saved');
+}
+
+/* ---------- Reminders ---------- */
+function renderReminders(){
+  const listEl = document.getElementById('reminder-list');
+  const emptyEl = document.getElementById('reminder-empty');
+  listEl.innerHTML='';
+  if(reminders.length===0){ emptyEl.style.display='block'; return; }
+  emptyEl.style.display='none';
+  reminders.forEach(r=>{
+    const row = document.createElement('div');
+    row.className='list-row';
+    row.innerHTML = '<div><div class="lr-title">'+escapeHtml(r.label)+'</div><div class="lr-sub">'+r.time+' daily</div></div>'+
+      '<div style="display:flex;align-items:center;gap:10px;">'+
+      '<div class="switch '+(r.enabled?'on':'')+'" onclick="toggleReminder(\''+r.id+'\')"></div>'+
+      '<button class="icon-btn" onclick="deleteReminder(\''+r.id+'\')">✕</button></div>';
+    listEl.appendChild(row);
+  });
+}
+function openReminderModal(){
+  document.getElementById('rem-label').value='';
+  document.getElementById('rem-time').value='';
+  if(window.Notification && Notification.permission==='default'){
+    Notification.requestPermission();
+  }
+  openModal('modal-reminder');
+}
+function saveReminder(){
+  const label = document.getElementById('rem-label').value.trim();
+  const time = document.getElementById('rem-time').value;
+  if(!label || !time){ showToast('Enter a label and time'); return; }
+  reminders.push({ id: uid(), label, time, enabled: true, lastFired: '' });
+  save(K_REMINDERS, reminders);
+  closeModal('modal-reminder');
+  renderReminders();
+  showToast('Reminder added');
+}
+function toggleReminder(id){
+  const r = reminders.find(x=>x.id===id);
+  if(r) r.enabled = !r.enabled;
+  save(K_REMINDERS, reminders);
+  renderReminders();
+}
+function deleteReminder(id){
+  reminders = reminders.filter(r=>r.id!==id);
+  save(K_REMINDERS, reminders);
+  renderReminders();
+}
+function checkReminders(){
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  const cur = hh+':'+mm;
+  const dateKey = todayStr();
+  reminders.forEach(r=>{
+    if(r.enabled && r.time===cur && r.lastFired!==dateKey+cur){
+      r.lastFired = dateKey+cur;
+      fireNotification(r.label);
+    }
+  });
+  save(K_REMINDERS, reminders);
+}
+function fireNotification(label){
+  showToast('⏰ '+label);
+  if(window.Notification && Notification.permission==='granted'){
+    try{ new Notification('BulkLog', { body: label, icon: '' }); }catch(e){}
+  }
+}
+
+/* ---------- Excel export (.xls via HTML table) ---------- */
+function exportExcel(){
+  let html = '<html><head><meta charset="UTF-8"></head><body>';
+  html += '<h2>BulkLog Export — Daily History</h2>';
+  html += '<table border="1"><tr><th>Date</th><th>Calories</th><th>Cal Target</th><th>Protein</th><th>Protein Target</th><th>Meals Done</th><th>Meals Planned</th></tr>';
+  history.forEach(h=>{
+    html += '<tr><td>'+h.date+'</td><td>'+h.totalCal+'</td><td>'+settings.calTarget+'</td><td>'+h.totalProt+'</td><td>'+settings.protTarget+'</td><td>'+h.mealsDone+'</td><td>'+h.mealsPlanned+'</td></tr>';
+  });
+  const todayTotals = computeTotals(today);
+  html += '<tr><td>'+today.date+' (today)</td><td>'+todayTotals.cal+'</td><td>'+settings.calTarget+'</td><td>'+todayTotals.prot+'</td><td>'+settings.protTarget+'</td><td>'+today.completed.length+'</td><td>'+plan.length+'</td></tr>';
+  html += '</table><br/><h2>Weight Log</h2>';
+  html += '<table border="1"><tr><th>Date</th><th>Weight ('+settings.weightUnit+')</th><th>Note</th></tr>';
+  [...weights].sort((a,b)=>a.date.localeCompare(b.date)).forEach(w=>{
+    html += '<tr><td>'+w.date+'</td><td>'+w.weight+'</td><td>'+(w.note||'')+'</td></tr>';
+  });
+  html += '</table><br/><h2>Meal Plan</h2>';
+  html += '<table border="1"><tr><th>Meal</th><th>Time</th><th>Category</th><th>Calories</th><th>Protein</th></tr>';
+  plan.forEach(m=>{
+    html += '<tr><td>'+m.name+'</td><td>'+m.time+'</td><td>'+m.category+'</td><td>'+m.cal+'</td><td>'+m.prot+'</td></tr>';
+  });
+  html += '</table></body></html>';
+
+  const blob = new Blob(['\ufeff'+html], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'BulkLog_Export_'+todayStr()+'.xls';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Excel file exported');
+}
+
+function triggerBackup(){
+  const data = { settings, plan, today, history, weights, reminders, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'BulkLog_Backup_'+todayStr()+'.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Backup downloaded');
+}
+
+function confirmReset(){
+  if(confirm('This will permanently erase all BulkLog data on this device. Continue?')){
+    localStorage.removeItem(K_SETTINGS);
+    localStorage.removeItem(K_PLAN);
+    localStorage.removeItem(K_TODAY);
+    localStorage.removeItem(K_HISTORY);
+    localStorage.removeItem(K_WEIGHTS);
+    localStorage.removeItem(K_REMINDERS);
+    settings = {...DEFAULT_SETTINGS};
+    plan = JSON.parse(JSON.stringify(DEFAULT_PLAN));
+    today = freshToday();
+    history = [];
+    weights = [];
+    reminders = [];
+    save(K_SETTINGS,settings); save(K_PLAN,plan); save(K_TODAY,today);
+    save(K_HISTORY,history); save(K_WEIGHTS,weights); save(K_REMINDERS,reminders);
+    switchTab('today');
+    showToast('All data reset');
+  }
+}
+
+/* ---------- Utility ---------- */
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+
+/* ---------- Service worker (offline caching) ---------- */
+if('serviceWorker' in navigator){
+  const swCode = "self.addEventListener('install',e=>self.skipWaiting());"+
+    "self.addEventListener('activate',e=>self.clients.claim());"+
+    "self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));});";
+  try{
+    const blob = new Blob([swCode], { type: 'text/javascript' });
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl).catch(()=>{});
+  }catch(e){}
+}
+
+/* ---------- Init ---------- */
+function init(){
+  ensureTodayCurrent();
+  switchTab('today');
+  setInterval(()=>{
+    ensureTodayCurrent();
+    checkReminders();
+    if(currentTab==='today') renderToday();
+  }, 30000);
+  window.addEventListener('resize', ()=>{ if(currentTab==='weight') renderWeight(); });
+}
+init();
+</script>
+</body>
+</html>
